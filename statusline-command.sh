@@ -120,12 +120,12 @@ if [ -n "$used" ]; then
   while [ $i -lt $empty ]; do empty_bar="${empty_bar}-"; i=$((i+1)); done
   used_display=$(printf "%.0f" "$used")
   if [ -n "$ctx_tokens_display" ]; then
-    ctx_bar="${DIM}${ctx_tokens_display} [${RESET}${GREEN}${filled_bar}${RESET}${DIM}${empty_bar}]${RESET} ${used_display}%"
+    ctx_bar="${DIM}c:${RESET}${DIM}${ctx_tokens_display} [${RESET}${GREEN}${filled_bar}${RESET}${DIM}${empty_bar}]${RESET} ${used_display}%"
   else
-    ctx_bar="${DIM}[${RESET}${GREEN}${filled_bar}${RESET}${DIM}${empty_bar}]${RESET} ${used_display}%"
+    ctx_bar="${DIM}c:${RESET}${DIM}[${RESET}${GREEN}${filled_bar}${RESET}${DIM}${empty_bar}]${RESET} ${used_display}%"
   fi
 else
-  ctx_bar="${DIM}[--------------------]${RESET} --%"
+  ctx_bar="${DIM}c:[--------------------]${RESET} --%"
 fi
 
 # Short display of cwd (replace $HOME with ~)
