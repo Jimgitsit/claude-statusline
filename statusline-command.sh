@@ -4,7 +4,6 @@ echo "$input" > /tmp/statusline-last-input.json
 
 # ANSI color codes
 CYAN='\033[36m'
-GREEN='\033[32m'
 YELLOW='\033[33m'
 MAGENTA='\033[35m'
 ORANGE='\033[38;5;208m'
@@ -54,19 +53,12 @@ if [ -n "$effort" ]; then
   model="${model}${DIM}:${RESET}${effort}"
 fi
 cwd=$(echo "$input" | jq -r '.workspace.current_dir')
-ctx_input_tokens=$(echo "$input" | jq -r 'if .context_window.current_usage != null then (.context_window.current_usage.input_tokens + .context_window.current_usage.cache_creation_input_tokens + .context_window.current_usage.cache_read_input_tokens) else 0 end' 2>/dev/null || echo 0)
-# Accurate context percentage: cache tokens / (model context - 64k reserved for output)
-model_id=$(echo "$input" | jq -r '.model.id // ""')
-cache_create=$(echo "$input" | jq -r '.context_window.current_usage.cache_creation_input_tokens // 0')
-cache_read=$(echo "$input" | jq -r '.context_window.current_usage.cache_read_input_tokens // 0')
-[ "$cache_create" = "null" ] && cache_create=0
-[ "$cache_read" = "null" ] && cache_read=0
-if echo "$model_id" | grep -qi "1m"; then total_context=1000000; else total_context=200000; fi
-used=""
-actual_tokens=$((cache_create + cache_read))
-if [ "$actual_tokens" -gt 0 ] 2>/dev/null; then
-  used=$(awk "BEGIN { u = ($actual_tokens / $total_context) * 100; if (u > 100) u = 100; printf \"%.1f\", u }")
-fi
+# Context usage: current input tokens vs. full context window size (matches used_percentage)
+ctx_used=$(echo "$input" | jq -r '.context_window.total_input_tokens // 0')
+ctx_total=$(echo "$input" | jq -r '.context_window.context_window_size // 200000')
+[ "$ctx_used" = "null" ] && ctx_used=0
+[ "$ctx_total" = "null" ] && ctx_total=200000
+[ "$ctx_total" = "0" ] && ctx_total=200000
 # Git branch: walk up from cwd looking for .git FILE first (linked worktrees have .git as a file;
 # nested repos like courses/ have .git as a directory, so this skips them and finds the worktree).
 # Falls back to normal git lookup if no .git file is found (main worktree or plain repo).
@@ -97,36 +89,23 @@ fi
 
 SEP="${DIM} | ${RESET}"
 
-# Context token count in human-readable format (e.g. 1.2k, 45k, 150k)
-ctx_tokens_display=""
-if [ "$ctx_input_tokens" -gt 0 ] 2>/dev/null; then
-  ctx_tokens_display=$(awk "BEGIN {
-    t = $ctx_input_tokens
-    if (t >= 1000) { printf \"%.1fk\", t / 1000 }
-    else { printf \"%d\", t }
-  }")
-fi
+# Format a token count as a compact string: 30006 -> 30K, 1000000 -> 1M
+fmt_tokens() {
+  awk "BEGIN {
+    t = $1
+    if (t >= 1000000) {
+      v = t / 1000000
+      if (v == int(v)) printf \"%dM\", v; else printf \"%.1fM\", v
+    } else if (t >= 1000) {
+      printf \"%dK\", int(t / 1000 + 0.5)
+    } else {
+      printf \"%d\", t
+    }
+  }"
+}
 
-# Context progress bar (20 chars wide) with colored filled/empty segments
-# Format: ctx: 1.2k [########----] 42%
-if [ -n "$used" ]; then
-  filled=$(awk "BEGIN { printf \"%d\", ($used / 100) * 20 }")
-  empty=$((20 - filled))
-  filled_bar=""
-  empty_bar=""
-  i=0
-  while [ $i -lt $filled ]; do filled_bar="${filled_bar}#"; i=$((i+1)); done
-  i=0
-  while [ $i -lt $empty ]; do empty_bar="${empty_bar}-"; i=$((i+1)); done
-  used_display=$(printf "%.0f" "$used")
-  if [ -n "$ctx_tokens_display" ]; then
-    ctx_bar="${DIM}c:${RESET}${DIM}${ctx_tokens_display} [${RESET}${GREEN}${filled_bar}${RESET}${DIM}${empty_bar}]${RESET} ${used_display}%"
-  else
-    ctx_bar="${DIM}c:${RESET}${DIM}[${RESET}${GREEN}${filled_bar}${RESET}${DIM}${empty_bar}]${RESET} ${used_display}%"
-  fi
-else
-  ctx_bar="${DIM}c:[--------------------]${RESET} --%"
-fi
+# Context usage display, e.g. c:124K/1M
+ctx_bar="${DIM}c:${RESET}$(fmt_tokens "$ctx_used")${DIM}/${RESET}$(fmt_tokens "$ctx_total")"
 
 # Short display of cwd (replace $HOME with ~)
 home="$HOME"
