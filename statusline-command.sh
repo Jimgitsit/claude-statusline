@@ -139,6 +139,25 @@ _fmt_reset() {
   fi
 }
 
+# Which day (1-7) of the current 7-day window we're on, derived from the reset epoch.
+# The window is 7 days long, so window_start = resets_at - 7d; day = elapsed_days + 1,
+# computed here as 8 - ceil(days_until_reset).
+_week_day() {
+  _epoch="$1"
+  if [ -z "$_epoch" ]; then return; fi
+  _now=$(date +%s)
+  awk "BEGIN {
+    rem = $_epoch - $_now
+    if (rem < 0) rem = 0
+    days_until = int(rem / 86400)
+    if (rem / 86400 > days_until) days_until = days_until + 1
+    day = 8 - days_until
+    if (day < 1) day = 1
+    if (day > 7) day = 7
+    print day
+  }"
+}
+
 rate_str=""
 if [ -n "$five_pct" ]; then
   five_fmt=$(printf "%.0f" "$five_pct")
@@ -153,11 +172,18 @@ fi
 if [ -n "$week_pct" ]; then
   week_fmt=$(printf "%.0f" "$week_pct")
   week_int=$(printf "%.0f" "$week_pct")
+  week_day_suffix=""
+  if [ -n "$week_resets_at" ]; then
+    week_day=$(_week_day "$week_resets_at")
+    if [ -n "$week_day" ]; then
+      week_day_suffix="${DIM}-d${RESET}${week_day}"
+    fi
+  fi
   if [ "$week_int" -ge 90 ] 2>/dev/null && [ -n "$week_resets_at" ]; then
     week_reset=$(_fmt_reset "$week_resets_at")
-    week_part="${YELLOW}${DIM}w:${RESET}${YELLOW}${week_fmt}%${RESET}${DIM} resets in ${week_reset}${RESET}"
+    week_part="${YELLOW}${DIM}w:${RESET}${YELLOW}${week_fmt}%${RESET}${week_day_suffix}${DIM} resets in ${week_reset}${RESET}"
   else
-    week_part="${DIM}w:${RESET}${week_fmt}%"
+    week_part="${DIM}w:${RESET}${week_fmt}%${week_day_suffix}"
   fi
   if [ -n "$rate_str" ]; then
     rate_str="${rate_str} ${week_part}"
