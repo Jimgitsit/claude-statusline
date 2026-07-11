@@ -197,18 +197,21 @@ rate_str=""
 if [ -n "$five_pct" ]; then
   five_fmt=$(printf "%.0f" "$five_pct")
   five_int=$(printf "%.0f" "$five_pct")
-  # Always show time-to-reset for the 5h session window: a pie glyph whose fill is
-  # the fraction of the window still remaining, then the exact dim countdown.
-  five_extra=""
+  # Pie glyph (fraction of the 5h window still remaining) always shows next to the
+  # percentage; the exact countdown is appended only once usage reaches 90%.
+  five_pie=""
   if [ -n "$five_resets_at" ]; then
-    five_pie=$(_time_pie "$five_resets_at" 18000)
-    five_reset=$(_fmt_reset "$five_resets_at")
-    five_extra="${DIM}-${RESET}${five_pie}${DIM}${five_reset}${RESET}"
+    five_glyph=$(_time_pie "$five_resets_at" 18000)
+    five_pie="${DIM}-${RESET}${five_glyph}"
   fi
   if [ "$five_int" -ge 90 ] 2>/dev/null; then
-    rate_str="${DIM}s:${RESET}${YELLOW}${five_fmt}%${RESET}${five_extra}"
+    five_reset=""
+    if [ -n "$five_resets_at" ]; then
+      five_reset="${DIM}$(_fmt_reset "$five_resets_at")${RESET}"
+    fi
+    rate_str="${DIM}s:${RESET}${YELLOW}${five_fmt}%${RESET}${five_pie}${five_reset}"
   else
-    rate_str="${DIM}s:${RESET}${five_fmt}%${five_extra}"
+    rate_str="${DIM}s:${RESET}${five_fmt}%${five_pie}"
   fi
 fi
 if [ -n "$week_pct" ]; then
