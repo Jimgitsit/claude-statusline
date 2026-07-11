@@ -203,7 +203,7 @@ if [ -n "$five_pct" ]; then
   if [ -n "$five_resets_at" ]; then
     five_pie=$(_time_pie "$five_resets_at" 18000)
     five_reset=$(_fmt_reset "$five_resets_at")
-    five_extra="${five_pie}${DIM}${five_reset}${RESET}"
+    five_extra="${DIM}-${RESET}${five_pie}${DIM}${five_reset}${RESET}"
   fi
   if [ "$five_int" -ge 90 ] 2>/dev/null; then
     rate_str="${DIM}s:${RESET}${YELLOW}${five_fmt}%${RESET}${five_extra}"
