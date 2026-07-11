@@ -139,6 +139,41 @@ _fmt_reset() {
   fi
 }
 
+# Pick a pie glyph (● ◕ ◑ ◔ ○) for the fraction of a time-window still remaining.
+# $1 = reset epoch, $2 = window length in seconds. Full pie = whole window left,
+# empty circle = reset imminent. Lets you eyeball "time left" against "quota used".
+_time_pie() {
+  _epoch="$1"
+  _window="$2"
+  if [ -z "$_epoch" ] || [ -z "$_window" ]; then
+    return
+  fi
+  if [ "$_window" -le 0 ] 2>/dev/null; then
+    return
+  fi
+  _now=$(date +%s)
+  _rem=$((_epoch - _now))
+  if [ "$_rem" -lt 0 ]; then
+    _rem=0
+  fi
+  if [ "$_rem" -gt "$_window" ]; then
+    _rem=$_window
+  fi
+  # Permille of the window still remaining, bucketed into five glyphs (centered buckets).
+  _pm=$((_rem * 1000 / _window))
+  if [ "$_pm" -ge 875 ]; then
+    printf '●'
+  elif [ "$_pm" -ge 625 ]; then
+    printf '◕'
+  elif [ "$_pm" -ge 375 ]; then
+    printf '◑'
+  elif [ "$_pm" -ge 125 ]; then
+    printf '◔'
+  else
+    printf '○'
+  fi
+}
+
 # Which day (1-7) of the current 7-day window we're on, derived from the reset epoch.
 # The window is 7 days long, so window_start = resets_at - 7d; day = elapsed_days + 1,
 # computed here as 8 - ceil(days_until_reset).
@@ -162,11 +197,18 @@ rate_str=""
 if [ -n "$five_pct" ]; then
   five_fmt=$(printf "%.0f" "$five_pct")
   five_int=$(printf "%.0f" "$five_pct")
-  if [ "$five_int" -ge 90 ] 2>/dev/null && [ -n "$five_resets_at" ]; then
+  # Always show time-to-reset for the 5h session window: a pie glyph whose fill is
+  # the fraction of the window still remaining, then the exact dim countdown.
+  five_extra=""
+  if [ -n "$five_resets_at" ]; then
+    five_pie=$(_time_pie "$five_resets_at" 18000)
     five_reset=$(_fmt_reset "$five_resets_at")
-    rate_str="${YELLOW}${DIM}s:${RESET}${YELLOW}${five_fmt}%${RESET}${DIM} resets in ${five_reset}${RESET}"
+    five_extra="${five_pie}${DIM}${five_reset}${RESET}"
+  fi
+  if [ "$five_int" -ge 90 ] 2>/dev/null; then
+    rate_str="${DIM}s:${RESET}${YELLOW}${five_fmt}%${RESET}${five_extra}"
   else
-    rate_str="${DIM}s:${RESET}${five_fmt}%"
+    rate_str="${DIM}s:${RESET}${five_fmt}%${five_extra}"
   fi
 fi
 if [ -n "$week_pct" ]; then
